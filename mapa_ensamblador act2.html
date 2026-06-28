@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa Conceptual · Lenguaje Ensamblador</title>
+<style>
+  :root{
+    --bg: #0B1220;
+    --bg-grid: #101a30;
+    --panel: #121b30;
+    --panel-border: #213152;
+    --text-main: #E8F0FF;
+    --text-soft: #93A6C4;
+    --core: #39FF88;
+    --core-dark: #0e3322;
+    --branchA: #5EC8FF;
+    --branchA-dark: #0e2940;
+    --branchB: #FFB347;
+    --branchB-dark: #3a2a0e;
+    --branchC: #FF6B9D;
+    --branchC-dark: #3a1428;
+    --code-bg: #060c18;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html,body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text-main);
+    font-family: 'Consolas', 'SFMono-Regular', 'Roboto Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body{
+    background-image:
+      linear-gradient(rgba(94,200,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(94,200,255,0.05) 1px, transparent 1px);
+    background-size: 36px 36px;
+    background-position: center;
+  }
+
+  .page{
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 36px 24px 80px;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    text-align:center;
+    margin-bottom: 18px;
+  }
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--core);
+    border: 1px solid rgba(57,255,136,0.35);
+    background: rgba(57,255,136,0.06);
+    padding: 6px 14px;
+    border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  .eyebrow .dot{
+    width:6px; height:6px; border-radius:50%;
+    background: var(--core);
+    box-shadow: 0 0 8px var(--core);
+    animation: blink 1.6s infinite ease-in-out;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  h1{
+    font-family: 'Courier New', monospace;
+    font-size: clamp(28px, 4.2vw, 46px);
+    margin: 0 0 10px;
+    letter-spacing: 1px;
+    font-weight: 700;
+  }
+  h1 .accent{ color: var(--core); }
+
+  .subtitle{
+    color: var(--text-soft);
+    font-size: 14px;
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .hint{
+    text-align:center;
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--text-soft);
+    letter-spacing: .5px;
+  }
+  .hint kbd{
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--text-main);
+  }
+
+  /* ---------- Map canvas ---------- */
+  .map-wrap{
+    position: relative;
+    margin-top: 30px;
+  }
+
+  svg.connectors{
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:100%;
+    pointer-events:none;
+    z-index:0;
+  }
+  svg.connectors path{
+    fill:none;
+    stroke-width: 2;
+    stroke-dasharray: 5 5;
+    opacity: 0.55;
+  }
+
+  .grid-map{
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    min-height: 760px;
+    z-index: 1;
+  }
+
+  /* Central node */
+  .core-node{
+    position: absolute;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 230px;
+    z-index: 5;
+  }
+
+  .node{
+    cursor: pointer;
+    border-radius: 14px;
+    text-align: center;
+    user-select: none;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    background: var(--panel);
+    border: 1.5px solid var(--panel-border);
+  }
+  .node:hover{ transform: translateY(-3px); }
+  .node:focus-visible{
+    outline: 2px solid var(--core);
+    outline-offset: 3px;
+  }
+
+  .core-node .node{
+    padding: 22px 16px;
+    border-color: var(--core);
+    background: linear-gradient(160deg, var(--core-dark), var(--panel) 70%);
+    box-shadow: 0 0 0 1px rgba(57,255,136,.25), 0 18px 40px -12px rgba(57,255,136,.35);
+  }
+  .core-node .node:hover{
+    box-shadow: 0 0 0 1px rgba(57,255,136,.45), 0 22px 50px -10px rgba(57,255,136,.55);
+  }
+  .core-node .ico{ font-size: 30px; display:block; margin-bottom:8px; }
+  .core-node .title{
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--core);
+  }
+  .core-node .sub{
+    font-size: 10.5px;
+    color: var(--text-soft);
+    margin-top: 4px;
+    letter-spacing: .5px;
+  }
+
+  /* Branch columns */
+  .branches{
+    position: relative;
+    margin-top: 360px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    z-index: 2;
+  }
+
+  .branch-col{
+    display:flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .branch-node .node{
+    width: 100%;
+    padding: 16px 14px;
+    text-align:center;
+  }
+  .branch-node .ico{ font-size: 22px; display:block; margin-bottom:6px; }
+  .branch-node .title{
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    line-height: 1.3;
+  }
+
+  .branch--A .node{ border-color: var(--branchA); background: linear-gradient(160deg, var(--branchA-dark), var(--panel) 75%); }
+  .branch--A .title{ color: var(--branchA); }
+  .branch--B .node{ border-color: var(--branchB); background: linear-gradient(160deg, var(--branchB-dark), var(--panel) 75%); }
+  .branch--B .title{ color: var(--branchB); }
+  .branch--C .node{ border-color: var(--branchC); background: linear-gradient(160deg, var(--branchC-dark), var(--panel) 75%); }
+  .branch--C .title{ color: var(--branchC); }
+
+  .leaf-row{
+    display:flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .leaf-node .node{
+    width: 100%;
+    padding: 12px 12px;
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    text-align: left;
+  }
+  .leaf-node .ico{ font-size: 17px; flex: none; }
+  .leaf-node .title{
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .branch--A .leaf-node .node{ border-color: rgba(94,200,255,.4); }
+  .branch--A .leaf-node .title{ color: #cfeaff; }
+  .branch--B .leaf-node .node{ border-color: rgba(255,179,71,.4); }
+  .branch--B .leaf-node .title{ color: #ffe3bc; }
+  .branch--C .leaf-node .node{ border-color: rgba(255,107,157,.4); }
+  .branch--C .leaf-node .title{ color: #ffd2e3; }
+
+  .branch-divider{
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-soft);
+    text-align:center;
+  }
+
+  /* ---------- Legend ---------- */
+  .legend{
+    display:flex;
+    justify-content:center;
+    gap: 22px;
+    flex-wrap: wrap;
+    margin-top: 42px;
+    font-size: 11.5px;
+    color: var(--text-soft);
+  }
+  .legend span{ display:inline-flex; align-items:center; gap:7px; }
+  .legend .swatch{ width:10px; height:10px; border-radius:3px; }
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(4,7,14,0.78);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 24px;
+  }
+  .overlay.open{ display:flex; animation: fadeIn .15s ease; }
+  @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
+
+  .modal{
+    width: 100%;
+    max-width: 560px;
+    max-height: 86vh;
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-top: 4px solid var(--modal-accent, var(--core));
+    border-radius: 14px;
+    padding: 26px 26px 22px;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,.6);
+    animation: rise .18s ease;
+  }
+  @keyframes rise{ from{ transform: translateY(10px); opacity:0;} to{ transform: translateY(0); opacity:1; } }
+
+  .modal-head{
+    display:flex;
+    justify-content: space-between;
+    align-items:flex-start;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .modal-tag{
+    font-size: 10.5px;
+    letter-spacing: 2px;
+    color: var(--modal-accent, var(--core));
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display:block;
+  }
+  .modal-title{
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.3;
+    color: var(--text-main);
+  }
+  .modal-close{
+    background: transparent;
+    border: 1px solid var(--panel-border);
+    color: var(--text-soft);
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    flex: none;
+    transition: border-color .15s, color .15s;
+  }
+  .modal-close:hover{ border-color: var(--modal-accent, var(--core)); color: var(--text-main); }
+
+  .modal-section{
+    margin-top: 16px;
+  }
+  .modal-section h4{
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--modal-accent, var(--core));
+    margin: 0 0 6px;
+  }
+  .modal-section p, .modal-section li{
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: #cfd9ec;
+    margin: 0;
+  }
+  .modal-section ul{
+    margin: 0;
+    padding-left: 18px;
+  }
+  .modal-section li + li{ margin-top: 4px; }
+
+  .code-block{
+    margin-top: 8px;
+    background: var(--code-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    color: #b9f6d0;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code-block .cmt{ color: #6b7c93; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 880px){
+    .core-node{ position: static; transform:none; margin: 0 auto 22px; }
+    .map-wrap svg.connectors{ display:none; }
+    .branches{
+      margin-top: 0;
+      grid-template-columns: 1fr;
+      gap: 26px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header>
+    <span class="eyebrow"><span class="dot"></span> SESIÓN 5 · REPASO</span>
+    <h1>Mapa Conceptual: <span class="accent">Lenguaje Ensamblador</span></h1>
+    <p class="subtitle">Explora la estructura de un programa, los modos de direccionamiento y las instrucciones básicas del procesador. Haz clic en cualquier nodo para abrir su explicación.</p>
+    <p class="hint">Haz <kbd>clic</kbd> en un nodo · <kbd>Esc</kbd> para cerrar la ventana emergente</p>
+  </header>
+
+  <div class="map-wrap">
+    <svg class="connectors" id="connectors"></svg>
+
+    <div class="core-node">
+      <div class="node" tabindex="0" role="button" data-node="core">
+        <span class="ico">🖥️</span>
+        <span class="title">LENGUAJE<br>ENSAMBLADOR</span>
+        <span class="sub">nodo central</span>
+      </div>
+    </div>
+
+    <div class="branches">
+
+      <!-- RAMA A -->
+      <div class="branch-col branch--A">
+        <div class="branch-node">
+          <div class="node" tabindex="0" role="button" data-node="A">
+            <span class="ico">🗂️</span>
+            <span class="title">ESTRUCTURA DE UN<br>PROGRAMA ENSAMBLADOR</span>
+          </div>
+        </div>
+        <span class="branch-divider">— sub-temas —</span>
+        <div class="leaf-row">
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="A1">
+              <span class="ico">📁</span>
+              <span class="title">Sección de Datos (.data)</span>
+            </div>
+          </div>
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="A2">
+              <span class="ico">⚙️</span>
+              <span class="title">Sección de Código (.code)</span>
+            </div>
+          </div>
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="A3">
+              <span class="ico">🏷️</span>
+              <span class="title">Etiquetas, comentarios y directivas</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RAMA B -->
+      <div class="branch-col branch--B">
+        <div class="branch-node">
+          <div class="node" tabindex="0" role="button" data-node="B">
+            <span class="ico">🎯</span>
+            <span class="title">MODOS DE<br>DIRECCIONAMIENTO</span>
+          </div>
+        </div>
+        <span class="branch-divider">— sub-temas —</span>
+        <div class="leaf-row">
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="B1">
+              <span class="ico">🔢</span>
+              <span class="title">Inmediato</span>
+            </div>
+          </div>
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="B2">
+              <span class="ico">📍</span>
+              <span class="title">Directo (a memoria)</span>
+            </div>
+          </div>
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="B3">
+              <span class="ico">🔗</span>
+              <span class="title">Registro / Indirecto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RAMA C -->
+      <div class="branch-col branch--C">
+        <div class="branch-node">
+          <div class="node" tabindex="0" role="button" data-node="C">
+            <span class="ico">⚡</span>
+            <span class="title">INSTRUCCIONES BÁSICAS<br>DEL PROCESADOR</span>
+          </div>
+        </div>
+        <span class="branch-divider">— sub-temas —</span>
+        <div class="leaf-row">
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="C1">
+              <span class="ico">↔️</span>
+              <span class="title">Transferencia de datos (MOV)</span>
+            </div>
+          </div>
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="C2">
+              <span class="ico">➕</span>
+              <span class="title">Aritméticas (ADD, SUB)</span>
+            </div>
+          </div>
+          <div class="leaf-node">
+            <div class="node" tabindex="0" role="button" data-node="C3">
+              <span class="ico">🔀</span>
+              <span class="title">Control de flujo (JMP, CALL, RET)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:#39FF88"></span> Nodo central</span>
+    <span><span class="swatch" style="background:#5EC8FF"></span> Estructura del programa</span>
+    <span><span class="swatch" style="background:#FFB347"></span> Modos de direccionamiento</span>
+    <span><span class="swatch" style="background:#FF6B9D"></span> Instrucciones del procesador</span>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <div>
+        <span class="modal-tag" id="modalTag">Concepto</span>
+        <h3 class="modal-title" id="modalTitle">Título</h3>
+      </div>
+      <button class="modal-close" id="modalClose" aria-label="Cerrar">✕</button>
+    </div>
+
+    <div class="modal-section">
+      <h4>Definición</h4>
+      <p id="modalDef"></p>
+    </div>
+
+    <div class="modal-section">
+      <h4>Características</h4>
+      <ul id="modalFeatures"></ul>
+    </div>
+
+    <div class="modal-section" id="modalExampleWrap">
+      <h4>Ejemplo</h4>
+      <div class="code-block" id="modalExample"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = {
+  core: {
+    tag: "Nodo central",
+    title: "Lenguaje Ensamblador",
+    accent: "#39FF88",
+    def: "Lenguaje de programación de bajo nivel, más cercano al lenguaje máquina que los lenguajes de alto nivel (C++, Java, Python). Cada instrucción en ensamblador suele corresponder a una instrucción que la CPU ejecuta directamente.",
+    features: [
+      "Se traduce casi línea por línea a código máquina.",
+      "Permite control preciso sobre registros, memoria y hardware.",
+      "Es específico de la arquitectura de CPU: poco portable.",
+      "Se usa en sistemas embebidos, drivers y optimización crítica."
+    ],
+    example: null
+  },
+  A: {
+    tag: "Rama 1",
+    title: "Estructura de un Programa Ensamblador",
+    accent: "#5EC8FF",
+    def: "Un programa fuente en ensamblador (.asm) se organiza en secciones que separan los datos de las instrucciones, utiliza etiquetas para identificar posiciones del código y admite comentarios y directivas que guían al ensamblador.",
+    features: [
+      "Se divide típicamente en sección de datos y sección de código.",
+      "Las etiquetas marcan direcciones de memoria o puntos del programa.",
+      "Las directivas no generan código máquina, solo instruyen al ensamblador.",
+      "Los comentarios documentan el código sin afectar su ejecución."
+    ],
+    example: null
+  },
+  A1: {
+    tag: "Estructura · A1",
+    title: "Sección de Datos (.data)",
+    accent: "#5EC8FF",
+    def: "Bloque del programa donde se declaran las variables y constantes, indicando su tamaño y, opcionalmente, su valor inicial.",
+    features: [
+      "Se identifica con una directiva como .data.",
+      "Cada variable tiene un nombre simbólico y un tipo (BYTE, WORD, DWORD).",
+      "No contiene instrucciones ejecutables, solo reservas de memoria.",
+      "Las cadenas de texto suelen terminar con un byte nulo (0)."
+    ],
+    example: `.data
+contador BYTE 10
+mensaje  BYTE "Hola",0`
+  },
+  A2: {
+    tag: "Estructura · A2",
+    title: "Sección de Código (.code)",
+    accent: "#5EC8FF",
+    def: "Bloque del programa donde se escriben, en orden, las instrucciones que la CPU ejecutará.",
+    features: [
+      "Se identifica con .code o .text.",
+      "Contiene el procedimiento principal (main) y las subrutinas.",
+      "Aquí se usan los mnemónicos: MOV, ADD, JMP, CALL, etc.",
+      "El flujo se ejecuta de arriba hacia abajo salvo que haya saltos."
+    ],
+    example: `.code
+main PROC
+    mov ax, contador
+    add ax, 5
+main ENDP`
+  },
+  A3: {
+    tag: "Estructura · A3",
+    title: "Etiquetas, comentarios y directivas",
+    accent: "#5EC8FF",
+    def: "Las etiquetas nombran una dirección de memoria o un punto del programa; los comentarios documentan el código; las directivas indican al ensamblador cómo procesar el código fuente.",
+    features: [
+      "Una etiqueta se escribe con dos puntos al final, ej. inicio:",
+      "Un comentario inicia con punto y coma (;) y se ignora al ensamblar.",
+      "Directivas comunes: EQU, el signo =, INCLUDE.",
+      "Las directivas no producen instrucciones máquina."
+    ],
+    example: `inicio:              ; etiqueta
+    mov cx, 5         ; comentario
+PI EQU <3.1416>       ; directiva`
+  },
+
+  B: {
+    tag: "Rama 2",
+    title: "Modos de Direccionamiento",
+    accent: "#FFB347",
+    def: "Formas en que una instrucción especifica dónde se encuentra el operando: un valor fijo, una dirección de memoria o el contenido de un registro.",
+    features: [
+      "Determinan cómo se calcula la dirección del operando.",
+      "Afectan la velocidad y flexibilidad del programa.",
+      "Los modos comunes son: inmediato, directo, registro e indirecto.",
+      "Son clave para acceder a variables, arreglos y estructuras."
+    ],
+    example: null
+  },
+  B1: {
+    tag: "Direccionamiento · B1",
+    title: "Inmediato",
+    accent: "#FFB347",
+    def: "El operando es un valor constante que viaja dentro de la propia instrucción.",
+    features: [
+      "Es el modo más rápido: no requiere acceso adicional a memoria.",
+      "Se usa para inicializar registros o variables con valores fijos.",
+      "El valor no puede cambiar durante la ejecución."
+    ],
+    example: `mov al, 5      ; 5 es un valor inmediato`
+  },
+  B2: {
+    tag: "Direccionamiento · B2",
+    title: "Directo (a memoria)",
+    accent: "#FFB347",
+    def: "El operando se obtiene leyendo una dirección de memoria específica, normalmente referida por el nombre de una variable.",
+    features: [
+      "La dirección de memoria queda fija dentro de la instrucción.",
+      "Permite acceder a variables declaradas en la sección de datos.",
+      "Es más lento que el modo inmediato porque accede a memoria."
+    ],
+    example: `mov al, contador   ; copia el valor almacenado en "contador"`
+  },
+  B3: {
+    tag: "Direccionamiento · B3",
+    title: "Registro / Indirecto",
+    accent: "#FFB347",
+    def: "En el modo de registro, el operando está dentro de un registro de la CPU. En el modo indirecto, un registro contiene la dirección de memoria donde realmente está el dato.",
+    features: [
+      "El registro indirecto se escribe entre corchetes [ ].",
+      "El modo de registro es muy rápido porque no toca memoria.",
+      "El modo indirecto permite recorrer arreglos y estructuras dinámicas."
+    ],
+    example: `mov ax, bx       ; registro: copia el valor de BX
+mov ax, [bx]     ; indirecto: copia el dato en la dirección que BX contiene`
+  },
+
+  C: {
+    tag: "Rama 3",
+    title: "Instrucciones Básicas del Procesador",
+    accent: "#FF6B9D",
+    def: "Comandos mínimos que la CPU puede ejecutar directamente: mover datos, realizar operaciones aritméticas y controlar el orden de ejecución del programa.",
+    features: [
+      "Cada instrucción se representa con un mnemónico (MOV, ADD, JMP...).",
+      "Trabajan principalmente sobre registros y memoria.",
+      "Algunas instrucciones modifican banderas (flags) del procesador.",
+      "Son la base de cualquier programa en ensamblador."
+    ],
+    example: null
+  },
+  C1: {
+    tag: "Instrucciones · C1",
+    title: "Transferencia de datos (MOV)",
+    accent: "#FF6B9D",
+    def: "Instrucciones que copian o mueven valores entre registros, memoria o constantes.",
+    features: [
+      "MOV es la instrucción más usada en lenguaje ensamblador.",
+      "El dato de origen no se destruye, solo se copia al destino.",
+      "El destino y el origen deben ser de tamaños compatibles."
+    ],
+    example: `mov ax, 10      ; AX = 10
+mov bx, ax      ; BX = AX`
+  },
+  C2: {
+    tag: "Instrucciones · C2",
+    title: "Aritméticas (ADD, SUB)",
+    accent: "#FF6B9D",
+    def: "Instrucciones que realizan operaciones matemáticas básicas directamente sobre registros o memoria.",
+    features: [
+      "ADD suma, SUB resta; también existen INC y DEC.",
+      "Modifican banderas como el acarreo (carry) o el cero (zero).",
+      "El resultado se almacena en el operando destino."
+    ],
+    example: `mov ax, 8
+add ax, 2       ; AX = 10
+sub ax, 5       ; AX = 5`
+  },
+  C3: {
+    tag: "Instrucciones · C3",
+    title: "Control de flujo (JMP, CALL, RET)",
+    accent: "#FF6B9D",
+    def: "Instrucciones que alteran el orden secuencial de ejecución, permitiendo saltos, bucles y llamadas a subrutinas.",
+    features: [
+      "JMP salta incondicionalmente a una etiqueta.",
+      "CALL invoca una subrutina y RET regresa de ella.",
+      "Los saltos condicionales (JE, JNE, JG...) dependen de las banderas."
+    ],
+    example: `cmp ax, 0
+je  fin         ; si AX = 0, salta a "fin"
+call subrutina
+ret`
+  }
+};
+
+// ---------- Modal logic ----------
+const overlay = document.getElementById('overlay');
+const modal = document.getElementById('modal');
+const modalTag = document.getElementById('modalTag');
+const modalTitle = document.getElementById('modalTitle');
+const modalDef = document.getElementById('modalDef');
+const modalFeatures = document.getElementById('modalFeatures');
+const modalExampleWrap = document.getElementById('modalExampleWrap');
+const modalExample = document.getElementById('modalExample');
+const modalClose = document.getElementById('modalClose');
+
+function openModal(key){
+  const d = DATA[key];
+  if(!d) return;
+  modal.style.setProperty('--modal-accent', d.accent);
+  modalTag.textContent = d.tag;
+  modalTag.style.color = d.accent;
+  modalTitle.textContent = d.title;
+  modalDef.textContent = d.def;
+  modalFeatures.innerHTML = d.features.map(f => `<li>${f}</li>`).join('');
+  if(d.example){
+    modalExampleWrap.style.display = 'block';
+    modalExample.textContent = d.example;
+  } else {
+    modalExampleWrap.style.display = 'none';
+  }
+  overlay.classList.add('open');
+}
+
+function closeModal(){
+  overlay.classList.remove('open');
+}
+
+document.querySelectorAll('[data-node]').forEach(el => {
+  el.addEventListener('click', () => openModal(el.getAttribute('data-node')));
+  el.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      openModal(el.getAttribute('data-node'));
+    }
+  });
+});
+
+modalClose.addEventListener('click', closeModal);
+overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(); });
+document.addEventListener('keydown', (e) => { if(e.key === 'Escape') closeModal(); });
+
+// ---------- Connector lines (desktop only) ----------
+function drawConnectors(){
+  const svg = document.getElementById('connectors');
+  if(window.innerWidth <= 880){
+    svg.innerHTML = '';
+    return;
+  }
+  const wrap = document.querySelector('.map-wrap');
+  const wrapRect = wrap.getBoundingClientRect();
+  svg.setAttribute('width', wrapRect.width);
+  svg.setAttribute('height', wrapRect.height);
+
+  const core = document.querySelector('.core-node .node');
+  const coreRect = core.getBoundingClientRect();
+  const coreBottom = {
+    x: coreRect.left + coreRect.width/2 - wrapRect.left,
+    y: coreRect.bottom - wrapRect.top
+  };
+
+  const colors = { A: '#5EC8FF', B: '#FFB347', C: '#FF6B9D' };
+  let paths = '';
+
+  ['A','B','C'].forEach(key => {
+    const branchNode = document.querySelector(`.branch-col.branch--${key} .branch-node .node`);
+    const r = branchNode.getBoundingClientRect();
+    const target = {
+      x: r.left + r.width/2 - wrapRect.left,
+      y: r.top - wrapRect.top
+    };
+    const midY = coreBottom.y + (target.y - coreBottom.y) * 0.5;
+    paths += `<path d="M ${coreBottom.x} ${coreBottom.y} C ${coreBottom.x} ${midY}, ${target.x} ${midY}, ${target.x} ${target.y}" stroke="${colors[key]}"/>`;
+  });
+
+  svg.innerHTML = paths;
+}
+
+window.addEventListener('resize', drawConnectors);
+window.addEventListener('load', drawConnectors);
+setTimeout(drawConnectors, 100);
+</script>
+
+</body>
+</html>
